@@ -1,0 +1,10 @@
+{% macro participation_notes(notes) %}
+{% if notes %}<div class="participation-notes">
+<details class="participation-note {{ notes[0].kind }}">
+  <summary title="{{ notes|map(attribute='label')|join('; ') }}" data-note-title="{{ notes[0].label if notes|length==1 else 'Zastrzeżenia do wpisu' }}"><span class="sr-only">{{ notes|map(attribute='label')|join('; ') }} — wyjaśnienie</span><span class="participation-info" aria-hidden="true">ⓘ</span></summary>
+  <div class="participation-explanation">{% for note in notes %}
+    <p>{% if notes|length>1 %}{{ note.label }}: {% endif %}{{ note.explanation }}</p>
+  {% endfor %}</div>
+</details>
+</div>{% endif %}
+{% endmacro %}

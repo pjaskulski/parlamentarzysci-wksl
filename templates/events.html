@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block title %}Sejmy i zjazdy · {{ app_title }}{% endblock %}
+{% block content %}
+<section class="catalog-heading"><div><p class="eyebrow">Wydarzenia parlamentarne</p><h1>Sejmy i zjazdy</h1></div></section>
+<form method="get" class="event-filters">
+<div><label for="code">Nazwa, miejsce lub kod</label><input id="code" name="code" value="{{ filters.code }}" placeholder="np. Grodno, 1632/II" maxlength="100"></div>
+<div><label for="type">Typ wydarzenia</label><select id="type" name="type"><option value="">Wszystkie typy</option>{% for kind in kinds %}<option value="{{ kind }}" {% if filters.type==kind %}selected{% endif %}>{{ kind|replace('_',' ')|capitalize }}</option>{% endfor %}</select></div>
+<div><label for="year_from">Od roku</label><input id="year_from" name="year_from" type="number" min="1400" max="1900" value="{{ filters.year_from }}"></div>
+<div><label for="year_to">Do roku</label><input id="year_to" name="year_to" type="number" min="1400" max="1900" value="{{ filters.year_to }}"></div>
+<button class="button primary" type="submit">Zastosuj</button><a href="{{ url_for('events') }}">Wyczyść</a>
+</form>
+{% if error %}<div class="notice error" role="alert">{{ error }}</div>{% endif %}
+<div class="results-heading"><h2>Chronologiczny wykaz</h2><span>Wydarzenia: {{ events|length }}</span></div>
+<div class="event-grid">{% for event in events %}<article class="event-card"><span class="kind-label event-codes">{{ event_codes.get(event.event_id,[])|join(' · ') or '—' }}</span><h2><a href="{{ url_for('event_detail',event_id=event.event_id) }}">{{ event.name }}</a></h2><p class="event-place">{{ event.place or 'Miejsce niepodane w nagłówku' }}</p><p class="event-date">{{ event.date_raw }}</p><p>Osoby: {{ event.people_count }}</p></article>{% endfor %}</div>
+{% if not events and not error %}<div class="empty"><h3>Brak wydarzeń w wybranym zakresie</h3><p>Zmień kod lub zakres lat.</p></div>{% endif %}
+{% endblock %}
