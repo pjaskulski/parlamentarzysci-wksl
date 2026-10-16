@@ -8,7 +8,9 @@
     const dark = theme === "dark";
     root.dataset.theme = dark ? "dark" : "light";
     if (toggle) {
-      const label = dark ? "Włącz motyw dzienny" : "Włącz motyw nocny";
+      const english = root.lang === "en";
+      const label = english ? (dark ? "Switch to light mode" : "Switch to dark mode")
+        : (dark ? "Włącz motyw dzienny" : "Włącz motyw nocny");
       toggle.setAttribute("aria-pressed", String(dark));
       toggle.setAttribute("aria-label", label);
       toggle.title = label;

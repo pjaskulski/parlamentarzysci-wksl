@@ -14,14 +14,16 @@ from markupsafe import Markup, escape
 from werkzeug.utils import secure_filename
 
 if __package__:
-    from .pdf_export import build_person_pdf
+    from .pdf_export import build_person_pdf, build_event_pdf
     from .participation import participation_notes
+    from .i18n import translate, language, counted
 else:
-    from pdf_export import build_person_pdf
+    from pdf_export import build_person_pdf, build_event_pdf
     from participation import participation_notes
+    from i18n import translate, language, counted
 
 ROOT = Path(__file__).resolve().parent
-TITLE = 'Baza Parlamentarzystów Wielkiego Księstwa Litewskiego 1566-1793'
+TITLE = 'Baza Parlamentarzystów Wielkiego Księstwa Litewskiego 1566–1793'
 ALPHABET = 'aąbcćdeęfghijklłmnńoópqrsśtuvwxyzźż'
 ROLE_NAMES = {'poseł':'Posłowie','senator':'Senatorowie','marszałek':'Marszałkowie','uczestnik':'Pozostali uczestnicy'}
 CERTAINTY = {'stwierdzone_w_źródle':'Stwierdzone w źródle','niepewne':'Niepewne',
@@ -106,6 +108,25 @@ def create_app(config=None):
         raise ValueError(f'Brak bazy biogramów: {path}. Wskaż plik opcją --database lub zmienną BIOGRAMS_DATABASE.')
     app.config['DATABASE'] = path
 
+    @app.before_request
+    def choose_language():
+        requested = request.args.get('lang')
+        saved = request.cookies.get('parliament-language', 'pl')
+        g.language = requested if requested in ('pl', 'en') else saved if saved in ('pl', 'en') else 'pl'
+
+    @app.url_defaults
+    def language_links(endpoint, values):
+        if endpoint != 'static' and language() == 'en':
+            values.setdefault('lang', 'en')
+
+    def language_url(selected):
+        allowed = {'q', 'mode', 'role', 'office', 'letter', 'sort', 'page',
+                   'year_from', 'year_to', 'code', 'type', 'view'}
+        values = {key:request.args.getlist(key) for key in allowed if key in request.args}
+        values.update(request.view_args or {})
+        values['lang'] = selected
+        return url_for(request.endpoint or 'index', **values)
+
     def get_db():
         if 'db' not in g:
             g.db = sqlite3.connect(path.as_uri()+'?mode=ro',uri=True)
@@ -132,17 +153,32 @@ def create_app(config=None):
 
     app.jinja_env.filters['json_load'] = lambda value:json.loads(value) if value else []
     app.jinja_env.filters['snippet'] = safe_snippet
-    app.jinja_env.filters['certainty'] = lambda value:CERTAINTY.get(value,value or '')
+    app.jinja_env.globals['_'] = translate
+    app.jinja_env.filters['translate'] = translate
+    app.jinja_env.filters['certainty'] = lambda value:translate(CERTAINTY.get(value,value or ''))
     app.jinja_env.filters['pretty_number'] = lambda value:f'{value:,}'.replace(',',' ')
     app.jinja_env.filters['format_source'] = format_source
-    app.jinja_env.filters['people_label'] = people_label
+    app.jinja_env.filters['people_label'] = lambda rows:counted(len({r['person_id'] for r in rows}), 'osoba', 'osoby', 'osób')
+    app.jinja_env.filters['biogram_count'] = lambda count:counted(count, 'biogram', 'biogramów', 'biogramów')
+    app.jinja_env.filters['role_count'] = lambda count:counted(count, 'funkcja parlamentarna', 'funkcje parlamentarne', 'funkcji parlamentarnych')
+    app.jinja_env.filters['life_text'] = lambda text:re.sub(r'\bur\.', 'b.', text).replace('zm.', 'd.') if language() == 'en' else text
 
     @app.context_processor
     def common():
-        return {'app_title':TITLE,'catalog_count':app.config['CATALOG_COUNT'],'role_names':ROLE_NAMES}
+        return {'app_title':translate(TITLE),'catalog_count':app.config['CATALOG_COUNT'],
+                'role_names':{k:translate(v) for k,v in ROLE_NAMES.items()},
+                'language':language(), 'language_url':language_url}
 
     @app.after_request
     def headers(response):
+        if request.endpoint != 'static':
+            response.headers['Content-Language'] = language()
+            response.vary.add('Cookie')
+            if (request.args.get('lang') in ('pl', 'en')
+                    and language() != request.cookies.get('parliament-language', 'pl')):
+                response.set_cookie('parliament-language', language(), max_age=365*24*60*60,
+                    path=request.script_root or '/', httponly=True,
+                    secure=request.is_secure, samesite='Lax')
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['Referrer-Policy'] = 'same-origin'
         response.headers['Content-Security-Policy'] = "default-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
@@ -282,6 +318,9 @@ def create_app(config=None):
     @app.route('/events')
     def events():
         db = get_db()
+        view = request.args.get('view', 'list')
+        if view not in ('list', 'cards'):
+            view = 'list'
         code = request.args.get('code','').strip()
         kind = request.args.get('type','')
         kinds = sorted({r[0] for r in db.execute('SELECT kind FROM events UNION SELECT event_type FROM person_event_roles') if r[0]})
@@ -315,8 +354,11 @@ def create_app(config=None):
         for match in db.execute('''SELECT DISTINCT event_id,normalized_code FROM event_code_matches
             WHERE event_id IS NOT NULL ORDER BY normalized_code'''):
             event_codes.setdefault(match['event_id'],[]).append(match['normalized_code'])
+        filters = dict(code=code,type=kind,year_from=start,year_to=end)
+        def view_url(selected):
+            return url_for('events', **{k:v for k,v in filters.items() if v}, view=selected)
         return render_template('events.html',events=rows,event_codes=event_codes,kinds=kinds,error=error,
-            filters=dict(code=code,type=kind,year_from=start,year_to=end)),400 if error else 200
+            filters=filters,view=view,view_url=view_url),400 if error else 200
 
     def role_groups(rows):
         labels=representation_labels(rows)
@@ -357,8 +399,7 @@ def create_app(config=None):
                 seen_people.add(key)
         return dict(sorted(groups.items(),key=lambda pair:list(ROLE_NAMES).index(pair[0]) if pair[0] in ROLE_NAMES else len(ROLE_NAMES)))
 
-    @app.route('/events/<event_id>')
-    def event_detail(event_id):
+    def event_context(event_id):
         db = get_db()
         row = db.execute('SELECT * FROM events WHERE event_id=?',(event_id,)).fetchone()
         if row is None:
@@ -371,8 +412,25 @@ def create_app(config=None):
         rows = db.execute('''SELECT er.*,p.name,p.surname,p.birth_date_raw,p.death_date_raw FROM person_event_roles er
             JOIN persons p ON p.person_id=er.person_id WHERE er.event_id=?
             ORDER BY COALESCE(p.surname,p.name) COLLATE POLISH,p.name COLLATE POLISH,er.position''',(event_id,)).fetchall()
-        return render_template('event.html',event=event,groups=role_groups(rows),
+        return dict(event=event,groups=role_groups(rows),
             people_count=len({r['person_id'] for r in rows}),candidates=[])
+
+    @app.route('/events/<event_id>')
+    def event_detail(event_id):
+        return render_template('event.html', **event_context(event_id))
+
+    @app.route('/events/<event_id>/pdf')
+    def event_pdf(event_id):
+        context = event_context(event_id)
+        stream = build_event_pdf(context, app_title=translate(TITLE),
+                                 role_names=ROLE_NAMES, translate=translate)
+        event = context['event']
+        label = '-'.join(event['codes']) or event_id
+        filename = secure_filename(event['name']+'-'+label)+'.pdf'
+        response = send_file(stream, mimetype='application/pdf', as_attachment=True,
+                             download_name=filename)
+        response.headers['Cache-Control'] = 'no-store'
+        return response
 
     @app.route('/events/detail')
     def event():

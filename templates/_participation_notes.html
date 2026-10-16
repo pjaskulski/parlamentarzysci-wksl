@@ -1,9 +1,9 @@
 {% macro participation_notes(notes) %}
 {% if notes %}<div class="participation-notes">
 <details class="participation-note {{ notes[0].kind }}">
-  <summary title="{{ notes|map(attribute='label')|join('; ') }}" data-note-title="{{ notes[0].label if notes|length==1 else 'Zastrzeżenia do wpisu' }}"><span class="sr-only">{{ notes|map(attribute='label')|join('; ') }} — wyjaśnienie</span><span class="participation-info" aria-hidden="true">ⓘ</span></summary>
+  <summary title="{{ notes|map(attribute='label')|map('translate')|join('; ') }}" data-note-title="{{ _(notes[0].label) if notes|length==1 else _('Zastrzeżenia do wpisu') }}"><span class="sr-only">{{ notes|map(attribute='label')|map('translate')|join('; ') }} {{ _('— wyjaśnienie') }}</span><span class="participation-info" aria-hidden="true">ⓘ</span></summary>
   <div class="participation-explanation">{% for note in notes %}
-    <p>{% if notes|length>1 %}{{ note.label }}: {% endif %}{{ note.explanation }}</p>
+    <p>{% if notes|length>1 %}{{ _(note.label) }}: {% endif %}{{ _(note.explanation) }}</p>
   {% endfor %}</div>
 </details>
 </div>{% endif %}

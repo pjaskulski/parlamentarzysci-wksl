@@ -10,6 +10,7 @@ def public_explanation(label, local=''):
         'Mandat niepewny': 'Nie ma pewności, czy był posłem na tym zgromadzeniu.',
         'Udział niepewny': 'Nie ma pewności, czy uczestniczył w tym zgromadzeniu.',
         'Funkcja niepewna': 'Nie ma pewności, czy pełnił tę funkcję podczas zgromadzenia.',
+        'Nieobecny na obradach': 'Został wybrany posłem, ale nie uczestniczył w obradach.',
         'Obecność niepotwierdzona': 'Nie potwierdzono jego obecności na obradach.',
         'Identyfikacja osoby niepewna': 'Nie wiadomo, czy wzmianka dotyczy tej osoby, czy innej osoby o podobnym imieniu lub nazwisku.',
         'Rozbieżność źródeł': 'Zachowane przekazy podają rozbieżne informacje o jego udziale w zgromadzeniu.',
@@ -57,7 +58,9 @@ def participation_notes(row):
     elif certainty == 'niepewne':
         label = 'Mandat niepewny' if role == 'poseł' else 'Udział niepewny' if role in ('senator','uczestnik') else 'Funkcja niepewna'
         add(label)
-    if attendance == 'nieustalona' and certainty != 'niepewne':
+    if attendance == 'nieobecny':
+        add('Nieobecny na obradach', 'info')
+    elif attendance == 'nieustalona' and certainty != 'niepewne':
         add('Obecność niepotwierdzona')
 
     identity_note = record.get('uwaga_o_niepewności') or row.get('note') or ''

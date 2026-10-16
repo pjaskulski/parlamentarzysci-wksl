@@ -1,16 +1,36 @@
 {% extends 'base.html' %}
-{% block title %}Sejmy i zjazdy · {{ app_title }}{% endblock %}
+{% block title %}{{ _('Sejmy i zjazdy') }} · {{ app_title }}{% endblock %}
 {% block content %}
-<section class="catalog-heading"><div><p class="eyebrow">Wydarzenia parlamentarne</p><h1>Sejmy i zjazdy</h1></div></section>
+<section class="catalog-heading"><div><p class="eyebrow">{{ _('Wydarzenia parlamentarne') }}</p><h1>{{ _('Sejmy i zjazdy') }}</h1></div></section>
 <form method="get" class="event-filters">
-<div><label for="code">Nazwa, miejsce lub kod</label><input id="code" name="code" value="{{ filters.code }}" placeholder="np. Grodno, 1632/II" maxlength="100"></div>
-<div><label for="type">Typ wydarzenia</label><select id="type" name="type"><option value="">Wszystkie typy</option>{% for kind in kinds %}<option value="{{ kind }}" {% if filters.type==kind %}selected{% endif %}>{{ kind|replace('_',' ')|capitalize }}</option>{% endfor %}</select></div>
-<div><label for="year_from">Od roku</label><input id="year_from" name="year_from" type="number" min="1400" max="1900" value="{{ filters.year_from }}"></div>
-<div><label for="year_to">Do roku</label><input id="year_to" name="year_to" type="number" min="1400" max="1900" value="{{ filters.year_to }}"></div>
-<button class="button primary" type="submit">Zastosuj</button><a href="{{ url_for('events') }}">Wyczyść</a>
+  <input type="hidden" name="lang" value="{{ language }}">
+  <input type="hidden" name="view" value="{{ view }}">
+<div><label for="code">{{ _('Nazwa, miejsce lub kod') }}</label><input id="code" name="code" value="{{ filters.code }}" placeholder="{{ _('np. Grodno, 1632/II') }}" maxlength="100"></div>
+<div><label for="type">{{ _('Typ wydarzenia') }}</label><select id="type" name="type"><option value="">{{ _('Wszystkie typy') }}</option>{% for kind in kinds %}<option value="{{ kind }}" {% if filters.type==kind %}selected{% endif %}>{{ _(kind|replace('_',' ')|capitalize) }}</option>{% endfor %}</select></div>
+<div><label for="year_from">{{ _('Od roku') }}</label><input id="year_from" name="year_from" type="number" min="1400" max="1900" value="{{ filters.year_from }}"></div>
+<div><label for="year_to">{{ _('Do roku') }}</label><input id="year_to" name="year_to" type="number" min="1400" max="1900" value="{{ filters.year_to }}"></div>
+<button class="button primary" type="submit">{{ _('Zastosuj') }}</button><a href="{{ url_for('events',view=view) }}">{{ _('Wyczyść') }}</a>
 </form>
-{% if error %}<div class="notice error" role="alert">{{ error }}</div>{% endif %}
-<div class="results-heading"><h2>Chronologiczny wykaz</h2><span>Wydarzenia: {{ events|length }}</span></div>
-<div class="event-grid">{% for event in events %}<article class="event-card"><span class="kind-label event-codes">{{ event_codes.get(event.event_id,[])|join(' · ') or '—' }}</span><h2><a href="{{ url_for('event_detail',event_id=event.event_id) }}">{{ event.name }}</a></h2><p class="event-place">{{ event.place or 'Miejsce niepodane w nagłówku' }}</p><p class="event-date">{{ event.date_raw }}</p><p>Osoby: {{ event.people_count }}</p></article>{% endfor %}</div>
-{% if not events and not error %}<div class="empty"><h3>Brak wydarzeń w wybranym zakresie</h3><p>Zmień kod lub zakres lat.</p></div>{% endif %}
+{% if error %}<div class="notice error" role="alert">{{ _(error) }}</div>{% endif %}
+<div class="results-heading events-results-heading"><h2>{{ _('Chronologiczny wykaz') }}</h2><div class="events-view-actions"><span>{{ _('Wydarzenia:') }} {{ events|length }}</span>
+  <div class="event-view-switch" role="group" aria-label="{{ _('Widok wydarzeń') }}">
+    <a href="{{ view_url('list') }}"{% if view=='list' %} aria-current="true"{% endif %}><svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M5 4h9M5 8h9M5 12h9M2 4h1M2 8h1M2 12h1"/></svg>{{ _('Lista') }}</a>
+    <a href="{{ view_url('cards') }}"{% if view=='cards' %} aria-current="true"{% endif %}><svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="2" y="2" width="4" height="4" rx=".5"/><rect x="10" y="2" width="4" height="4" rx=".5"/><rect x="2" y="10" width="4" height="4" rx=".5"/><rect x="10" y="10" width="4" height="4" rx=".5"/></svg>{{ _('Kafelki') }}</a>
+  </div>
+</div></div>
+{% if view=='cards' %}
+<div class="event-grid">{% for event in events %}<article class="event-card"><span class="kind-label event-codes">{{ event_codes.get(event.event_id,[])|join(' · ') or '—' }}</span><h2><a href="{{ url_for('event_detail',event_id=event.event_id) }}">{{ _(event.name) }}</a></h2><p class="event-place">{{ event.place or _('Miejsce niepodane w nagłówku') }}</p><p class="event-date">{{ event.date_raw }}</p><p>{{ _('Osoby:') }} {{ event.people_count }}</p></article>{% endfor %}</div>
+{% elif events %}
+<div class="table-scroll event-list-wrapper" role="region" aria-label="{{ _('Lista wydarzeń') }}" tabindex="0">
+  <table class="event-list"><thead><tr><th scope="col">{{ _('Kod') }}</th><th scope="col">{{ _('Sejm lub zjazd') }}</th><th scope="col">{{ _('Miejsce') }}</th><th scope="col">{{ _('Data') }}</th><th scope="col" class="event-list-count">{{ _('Osoby') }}</th></tr></thead>
+    <tbody>{% for event in events %}<tr>
+      <td class="event-list-code">{{ event_codes.get(event.event_id,[])|join(' · ') or '—' }}</td>
+      <td class="event-list-name"><a href="{{ url_for('event_detail',event_id=event.event_id) }}">{{ _(event.name) }}</a></td>
+      <td>{{ event.place or _('Miejsce niepodane w nagłówku') }}</td>
+      <td>{{ event.date_raw }}</td><td class="event-list-count">{{ event.people_count }}</td>
+    </tr>{% endfor %}</tbody>
+  </table>
+</div>
+{% endif %}
+{% if not events and not error %}<div class="empty"><h3>{{ _('Brak wydarzeń w wybranym zakresie') }}</h3><p>{{ _('Zmień kod lub zakres lat.') }}</p></div>{% endif %}
 {% endblock %}

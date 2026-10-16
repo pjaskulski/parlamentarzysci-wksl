@@ -1,4 +1,4 @@
-"""Eksport danych karty osoby do PDF, bez zapisywania plików na serwerze."""
+"""Eksport kart osób i wydarzeń do PDF, bez zapisywania plików na serwerze."""
 from io import BytesIO
 from pathlib import Path
 from xml.sax.saxutils import escape
@@ -161,9 +161,132 @@ def build_person_pdf(context, *, app_title, format_source, certainty):
         canvas.drawRightString(width-20*mm,13*mm,f'Strona {document.page}')
         if document.page>1:
             canvas.setFont('CatalogSans',7)
-            canvas.drawString(20*mm,height-14*mm,'Baza Parlamentarzystów Wielkiego Księstwa Litewskiego 1566-1793')
+            canvas.drawString(20*mm,height-14*mm,'Baza Parlamentarzystów Wielkiego Księstwa Litewskiego 1566–1793')
         canvas.restoreState()
 
     doc.build(story,onFirstPage=page_decoration,onLaterPages=page_decoration)
+    stream.seek(0)
+    return stream
+
+
+def build_event_pdf(context, *, app_title, role_names, translate=lambda text: text):
+    """Eksport karty wydarzenia, z tymi samymi grupami osób co w widoku WWW."""
+    from reportlab.lib.pagesizes import landscape
+    from reportlab.platypus import CondPageBreak
+
+    event = context['event']
+    stream = BytesIO()
+    page_size = landscape(A4)
+    doc = SimpleDocTemplate(stream, pagesize=page_size, rightMargin=18*mm,
+        leftMargin=18*mm, topMargin=18*mm, bottomMargin=20*mm,
+        title=translate(event['name']), author='Pracownia Historii Cyfrowej IHPAN',
+        subject=app_title)
+    body = ParagraphStyle('EventBody', fontName='CatalogSans', fontSize=9,
+        leading=13, textColor=INK, spaceAfter=6)
+    small = ParagraphStyle('EventSmall', parent=body, fontSize=8,
+        leading=12, textColor=MUTED)
+    title = ParagraphStyle('EventTitle', parent=body, fontName='CatalogSerif',
+        fontSize=22, leading=28, spaceAfter=10)
+    heading = ParagraphStyle('EventHeading', parent=body, fontName='CatalogSerif',
+        fontSize=14, leading=19, spaceBefore=14, spaceAfter=8, keepWithNext=True)
+    group_heading = ParagraphStyle('EventGroupHeading', parent=heading, keepWithNext=False)
+    label = ParagraphStyle('EventLabel', parent=body, fontName='CatalogBold',
+        fontSize=8, leading=12, textColor=MUTED)
+    story, footnotes, note_numbers = [], [], {}
+
+    def paragraph(text, style=body):
+        text = str(text or '').replace('\u00a0', ' ').replace('\u2011', '-')
+        return Paragraph(escape(text).replace('\n', '<br/>'), style)
+
+    def references(notes):
+        numbers = []
+        for note in notes:
+            key = (note['label'], note['explanation'])
+            if key not in note_numbers:
+                note_numbers[key] = len(footnotes)+1
+                footnotes.append(key)
+            number = note_numbers[key]
+            if number not in numbers:
+                numbers.append(number)
+        return ' '+''.join(f'[{n}]' for n in numbers) if numbers else ''
+
+    story.append(paragraph(app_title, small))
+    codes = ' · '.join(event['codes'])
+    if codes:
+        story.append(paragraph(codes, small))
+    story.append(paragraph(translate(event['name']), title))
+    story.append(paragraph(' · '.join(filter(None, [event.get('place'), event.get('date_raw')]))))
+    story.append(paragraph(translate('Osoby:')+' '+str(context['people_count']), small))
+    if event['occurrence_status'] in ('not_held', 'cancelled'):
+        story.append(paragraph(translate('Obrady nie odbyły się.')))
+    if len(event['sessions']) > 1:
+        story.append(paragraph(translate('Części obrad'), heading))
+        for session in event['sessions']:
+            text = ' · '.join(filter(None, [session.get('place') or event.get('place'), session.get('date_raw')]))
+            if session.get('continuation'):
+                text += ' · '+translate('Kontynuacja po limicie')
+            story.append(paragraph(text))
+
+    if not context['groups']:
+        story.append(paragraph(translate('Brak powiązanych osób.')))
+    for role, people in context['groups'].items():
+        group_title = paragraph(translate(role_names.get(role, role.capitalize()))+
+                                ' ('+str(len(people))+')', group_heading)
+        headers = ['Osoba', 'Lata życia']
+        if role == 'poseł':
+            headers.append('Reprezentacja')
+        headers.append('Urzędy')
+        values = [[paragraph(translate(h), label) for h in headers]]
+        for person in people:
+            life = person['life_years']
+            if translate('Lata życia') != 'Lata życia':
+                # Skróty interfejsu, bez zmieniania historycznego datowania.
+                life = life.replace('ur.', 'b.').replace('zm.', 'd.')
+            cells = [person['name']+references(person['participation_notes']), life]
+            if role == 'poseł':
+                cells.append('; '.join(person['representations']) or '-')
+            cells.append(', '.join(person['offices']) or '-')
+            values.append([paragraph(cell) for cell in cells])
+        widths = [.27, .13, .17, .43] if role == 'poseł' else [.29, .14, .57]
+        table = LongTable(values, colWidths=[doc.width*w for w in widths],
+            repeatRows=1, hAlign='LEFT', splitByRow=1, splitInRow=1)
+        table_style = TableStyle([
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ('LEFTPADDING', (0,0), (-1,-1), 0),
+            ('RIGHTPADDING', (0,0), (-1,-1), 12),
+            ('TOPPADDING', (0,0), (-1,-1), 7),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 7),
+            ('LINEBELOW', (0,0), (-1,0), .6, LINE),
+            ('LINEBELOW', (0,1), (-1,-1), .35, LINE),
+        ])
+        table.setStyle(table_style)
+        # Zwiąż nagłówek z pierwszym wierszem, zamiast przenosić całą długą
+        # tabelę na następną stronę przez keepWithNext.
+        first_rows = LongTable(values[:2], colWidths=[doc.width*w for w in widths])
+        first_rows.setStyle(table_style)
+        first_height = first_rows.wrap(doc.width, doc.height)[1]
+        title_height = group_title.wrap(doc.width, doc.height)[1]
+        story.extend([CondPageBreak(first_height+title_height+
+                                   group_title.getSpaceBefore()+group_title.getSpaceAfter()),
+                      group_title, table])
+    if footnotes:
+        story.append(paragraph(translate('Zastrzeżenia dotyczące udziału'), heading))
+        for number, (note_label, explanation) in enumerate(footnotes, 1):
+            story.append(paragraph(f'[{number}] '+translate(note_label)+': '+translate(explanation), small))
+
+    def decoration(canvas, document):
+        width, height = page_size
+        canvas.saveState()
+        canvas.setStrokeColor(LINE)
+        canvas.line(18*mm, 15*mm, width-18*mm, 15*mm)
+        canvas.setFillColor(MUTED)
+        canvas.setFont('CatalogSans', 7)
+        canvas.drawString(18*mm, 10*mm, 'Pracownia Historii Cyfrowej IHPAN, 2026')
+        canvas.drawRightString(width-18*mm, 10*mm, translate('Strona')+' '+str(document.page))
+        if document.page > 1:
+            canvas.drawString(18*mm, height-11*mm, app_title)
+        canvas.restoreState()
+
+    doc.build(story, onFirstPage=decoration, onLaterPages=decoration)
     stream.seek(0)
     return stream
