@@ -3,8 +3,26 @@ import json
 import re
 
 
+def distinct_explanations(notes):
+    """Usuń powtórzenia tekstu w prezentacji, zachowując pierwsze oznaczenie."""
+    result, seen = [], set()
+    for note in notes:
+        key = ' '.join(note['explanation'].split()).casefold()
+        if key not in seen:
+            result.append(note)
+            seen.add(key)
+    return result
+
+
+def display_participation_notes(row):
+    return distinct_explanations(participation_notes(row))
+
+
 def public_explanation(label, local=''):
     defaults = {
+        'Przybył w trakcie obrad': 'Dołączył do zgromadzenia po rozpoczęciu obrad.',
+        'Reprezentacja niepewna': 'Nie ustalono jednoznacznie, jakie terytorium reprezentował.',
+        'Nie uczestniczył w posiedzeniach senatu': 'Był obecny w miejscu obrad, ale nie uczestniczył w posiedzeniach senatu.',
         'Mandat nieuznany': 'Wybór tej osoby na posła nie został uznany za prawidłowy.',
         'Informacja zakwestionowana': 'Przypisanie tej funkcji jest kwestionowane i nie stanowi potwierdzenia udziału w zgromadzeniu.',
         'Mandat niepewny': 'Nie ma pewności, czy był posłem na tym zgromadzeniu.',
@@ -14,6 +32,11 @@ def public_explanation(label, local=''):
         'Obecność niepotwierdzona': 'Nie potwierdzono jego obecności na obradach.',
         'Identyfikacja osoby niepewna': 'Nie wiadomo, czy wzmianka dotyczy tej osoby, czy innej osoby o podobnym imieniu lub nazwisku.',
         'Rozbieżność źródeł': 'Zachowane przekazy podają rozbieżne informacje o jego udziale w zgromadzeniu.',
+        'Mandat zawieszony': 'Zawieszono go w prawach posła; nie oznaczało to usunięcia z izby.',
+        'Mandat utrzymany': 'Pomimo próby zakwestionowania mandatu pozostał w izbie poselskiej.',
+        'Mandat kwestionowany': 'Przeciwko mandatowi wniesiono protest; nie oznacza to potwierdzonego odrzucenia wyboru.',
+        'Przejście do senatu': 'W trakcie sejmu przeszedł z izby poselskiej do senatu po objęciu urzędu senatorskiego.',
+        'Protest przeciw sejmikowi': 'Wniesiono protest przeciw sejmikowi, na którym wybrano posłów; nie jest to dowód odrzucenia ich mandatów.',
     }
     if label == 'Mandat niepewny' and 'poborc' in local.casefold():
         return 'Pełnił funkcję poborcy podatków, ale nie ma pewności, czy był również posłem.'
@@ -73,7 +96,23 @@ def participation_notes(row):
         add('Identyfikacja osoby niepewna')
     elif certainty == 'niepewne' and re.search(r'\bmoże\s+to\b|\btożsamoś\w*|\bpomyłka co do nazwiska\b', identity_text, re.I):
         add('Identyfikacja osoby niepewna')
+    if record.get('data_przybycia'):
+        add('Przybył w trakcie obrad', 'info')
+    if record.get('niepewność_reprezentacji'):
+        add('Reprezentacja niepewna')
+    if role == 'senator' and record.get('nie_zasiadał_w_radzie'):
+        add('Nie uczestniczył w posiedzeniach senatu', 'info')
     conflict = record.get('sprzeczność_źródłowa')
     if conflict:
         add('Rozbieżność źródeł')
+    if role == 'poseł' and record.get('status_mandatu') == 'zawieszony':
+        add('Mandat zawieszony', 'info')
+    elif role == 'poseł' and record.get('status_mandatu') == 'kwestionowany_utrzymany':
+        add('Mandat utrzymany', 'info')
+    elif role == 'poseł' and record.get('status_mandatu') == 'kwestionowany':
+        add('Mandat kwestionowany', 'info')
+    if role == 'poseł' and record.get('przejście_do_senatu'):
+        add('Przejście do senatu', 'info')
+    if role == 'poseł' and record.get('protest_przeciw_sejmikowi'):
+        add('Protest przeciw sejmikowi', 'info')
     return notes

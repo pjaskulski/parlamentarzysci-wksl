@@ -143,3 +143,7 @@
 
 .results-heading .results-count{font-size:1rem;white-space:nowrap}
 .results-count strong{font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+
+/* Zastrzeżenia udziału: kolor uzupełnia dostępny przycisk z objaśnieniem. */
+tr.participation-uncertain>td{background:#fff8e8}
+@media screen{[data-theme="dark"] tr.participation-uncertain>td{background:#363020}}

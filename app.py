@@ -15,11 +15,11 @@ from werkzeug.utils import secure_filename
 
 if __package__:
     from .pdf_export import build_person_pdf, build_event_pdf
-    from .participation import participation_notes
+    from .participation import display_participation_notes as participation_notes, distinct_explanations
     from .i18n import translate, language, counted
 else:
     from pdf_export import build_person_pdf, build_event_pdf
-    from participation import participation_notes
+    from participation import display_participation_notes as participation_notes, distinct_explanations
     from i18n import translate, language, counted
 
 ROOT = Path(__file__).resolve().parent
@@ -394,7 +394,7 @@ def create_app(config=None):
                 person['life_years'] = life_years(row)
                 person['offices'] = offices.get(row['person_id'],[])
                 person['representations']=representations.get(key,[])
-                person['participation_notes']=qualifications.get(key,[])
+                person['participation_notes']=distinct_explanations(qualifications.get(key,[]))
                 groups.setdefault(row['role'],[]).append(person)
                 seen_people.add(key)
         return dict(sorted(groups.items(),key=lambda pair:list(ROLE_NAMES).index(pair[0]) if pair[0] in ROLE_NAMES else len(ROLE_NAMES)))
