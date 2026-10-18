@@ -6,7 +6,7 @@
   <title>{% block title %}{{ app_title }}{% endblock %}</title>
   <meta name="description" content="{{ _('Katalog biograficzny parlamentarzystów Wielkiego Księstwa Litewskiego. Biogramy, urzędy, funkcje parlamentarne i źródła.') }}">
   <script src="{{ url_for('static',filename='theme.js') }}"></script>
-  <link rel="stylesheet" href="{{ url_for('static',filename='catalog.css',v='20261016-6') }}">
+  <link rel="stylesheet" href="{{ url_for('static',filename='catalog.css',v='20261018-8') }}">
   <link rel="icon" href="{{ url_for('static',filename='favicon.svg') }}" type="image/svg+xml">
 </head>
 <body>
@@ -22,6 +22,7 @@
     <div class="language-switch" role="group" aria-label="{{ _('Język interfejsu') }}">
       <a href="{{ language_url('pl') }}" lang="pl" hreflang="pl" aria-label="Polski"{% if language=='pl' %} aria-current="true"{% endif %}>PL</a><span aria-hidden="true">/</span><a href="{{ language_url('en') }}" lang="en" hreflang="en" aria-label="English"{% if language=='en' %} aria-current="true"{% endif %}>EN</a>
     </div>
+    <button type="button" id="app-help-open" class="app-help-button" aria-haspopup="dialog" aria-controls="app-help-dialog">{{ _('Pomoc') }}</button>
     <img class="ihpan-logo" src="{{ url_for('static',filename='logo-ihpan.png') }}" alt="{{ _('Instytut Historii im. Tadeusza Manteuffla Polskiej Akademii Nauk') }}">
   </div>
 </div></header>
@@ -45,7 +46,7 @@
     </ul>
     <p>{{ _('Zapisy localStorage nie mają automatycznej daty wygaśnięcia. Pozostają do usunięcia danych witryny w przeglądarce. Można je usunąć lub zablokować w ustawieniach przeglądarki; wówczas aplikacja może nie pamiętać wyborów, a komunikat może pojawiać się ponownie.') }}</p>
   </details>
-  <div class="footer-bottom"><span>{{ _('Baza Parlamentarzystów WKsL · Katalog biograficzny') }}</span><span>{{ _('Aplikacja przygotowana przez Pracownię Historii Cyfrowej IHPAN, 2026') }}</span></div>
+  <div class="footer-bottom"><span>{{ _('Baza Parlamentarzystów WKsL · Katalog biograficzny') }}<br>{{ _('Projekt NPRH nr 11H 18 0130 87: „Parlamentarzyści Wielkiego Księstwa Litewskiego 1566–1793”.') }}</span><span>{{ _('Aplikacja przygotowana przez Pracownię Historii Cyfrowej IHPAN, 2026') }}</span></div>
 </div></footer>
 
 <dialog id="participation-dialog" class="participation-dialog" aria-labelledby="participation-dialog-title" aria-describedby="participation-dialog-text">
@@ -54,4 +55,6 @@
 </dialog>
 <script src="{{ url_for('static',filename='participation-notes.js') }}" defer></script>
 <script src="{{ url_for('static',filename='storage-notice.js') }}" defer></script>
+{% include '_app_help.html' %}
+<script src="{{ url_for('static',filename='app-help.js') }}" defer></script>
 </body></html>

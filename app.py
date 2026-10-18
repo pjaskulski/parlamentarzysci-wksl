@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import sqlite3
 import unicodedata
+from urllib.parse import urlencode, parse_qs
 
 from flask import Flask, abort, g, render_template, request, send_file, url_for, redirect
 from markupsafe import Markup, escape
@@ -15,10 +16,16 @@ from werkzeug.utils import secure_filename
 
 if __package__:
     from .pdf_export import build_person_pdf, build_event_pdf
+    from .docx_export import build_person_docx, build_event_docx
+    from .career import build_career
+    from .xlsx_export import build_event_xlsx, build_people_xlsx, build_events_xlsx
     from .participation import display_participation_notes as participation_notes, distinct_explanations
     from .i18n import translate, language, counted
 else:
     from pdf_export import build_person_pdf, build_event_pdf
+    from docx_export import build_person_docx, build_event_docx
+    from career import build_career
+    from xlsx_export import build_event_xlsx, build_people_xlsx, build_events_xlsx
     from participation import display_participation_notes as participation_notes, distinct_explanations
     from i18n import translate, language, counted
 
@@ -38,6 +45,16 @@ def polish_key(text):
 def fold(text):
     text = text.translate(str.maketrans({'ł':'l','Ł':'L'}))
     return ''.join(c for c in unicodedata.normalize('NFD',text) if not unicodedata.combining(c))
+
+
+def territory_parts(text):
+    """Nazwy składowe bez rozstrzygania charakteru wspólnego przypisania."""
+    return [part.strip() for part in re.split(r',|\s+i\s+', text or '') if part.strip()]
+
+
+def territory_matches(text, query):
+    needle = fold(query).casefold().strip()
+    return any(fold(part).casefold().startswith(needle) for part in territory_parts(text))
 
 
 def fts_query(query, mode):
@@ -121,7 +138,7 @@ def create_app(config=None):
 
     def language_url(selected):
         allowed = {'q', 'mode', 'role', 'office', 'letter', 'sort', 'page',
-                   'year_from', 'year_to', 'code', 'type', 'view'}
+                   'year_from', 'year_to', 'code', 'type', 'view', 'territory', 'catalogue'}
         values = {key:request.args.getlist(key) for key in allowed if key in request.args}
         values.update(request.view_args or {})
         values['lang'] = selected
@@ -134,6 +151,7 @@ def create_app(config=None):
             g.db.execute('PRAGMA query_only=ON')
             g.db.execute('PRAGMA foreign_keys=ON')
             g.db.create_collation('POLISH',lambda a,b:(polish_key(a)>polish_key(b))-(polish_key(a)<polish_key(b)))
+            g.db.create_function('territory_matches',2,territory_matches)
             g.db.create_function('search_fold',1,lambda text:fold(text or '').casefold())
         return g.db
 
@@ -185,19 +203,23 @@ def create_app(config=None):
         return response
 
     @app.route('/')
-    def index():
+    def index(export=False, navigation_args=None):
+        args = request.args if navigation_args is None else navigation_args
         db = get_db()
-        q = request.args.get('q','').strip()
-        mode = request.args.get('mode','words')
-        role = request.args.get('role','')
-        office = request.args.get('office','').strip()
-        letter = request.args.get('letter','').casefold()
-        sort = request.args.get('sort','relevance' if q else 'name')
-        page_raw = request.args.get('page','1')
-        start_raw,end_raw = request.args.get('year_from','').strip(),request.args.get('year_to','').strip()
-        filters = dict(q=q,mode=mode,role=role,office=office,letter=letter,sort=sort,year_from=start_raw,year_to=end_raw)
+        q = args.get('q','').strip()
+        mode = args.get('mode','words')
+        role = args.get('role','')
+        office = args.get('office','').strip()
+        territory = args.get('territory','').strip() if role == 'poseł' else ''
+        has_representations = bool(db.execute("SELECT 1 FROM sqlite_master WHERE name='role_representations'").fetchone())
+        territories = sorted({part for row in db.execute('SELECT DISTINCT territory_name FROM role_representations') for part in territory_parts(row[0])}, key=polish_key) if has_representations else []
+        letter = args.get('letter','').casefold()
+        sort = args.get('sort','relevance' if q else 'name')
+        page_raw = args.get('page','1')
+        start_raw,end_raw = args.get('year_from','').strip(),args.get('year_to','').strip()
+        filters = dict(q=q,mode=mode,role=role,office=office,territory=territory,letter=letter,sort=sort,year_from=start_raw,year_to=end_raw)
         error = None
-        if len(q)>300 or len(office)>100:
+        if len(q)>300 or len(office)>100 or len(territory)>100:
             error = 'Zapytanie jest zbyt długie. Skróć tekst wyszukiwania.'
         elif mode not in ('words','phrase','fts') or role not in ('',*ROLE_NAMES) or sort not in ('name','relevance') or (letter and letter not in ALPHABET):
             error = 'Niepoprawny filtr wyszukiwania.'
@@ -234,15 +256,24 @@ def create_app(config=None):
             literal = fold(office).casefold().replace('\\','\\\\').replace('%','\\%').replace('_','\\_')
             conditions.append("EXISTS(SELECT 1 FROM person_offices o WHERE o.person_id=p.person_id AND (search_fold(o.name) LIKE ? ESCAPE '\\' OR search_fold(o.office_type) LIKE ? ESCAPE '\\'))")
             params.extend(['%'+literal+'%']*2)
-        if role or year_from or year_to:
+        if role or year_from or year_to or territory:
             event_conditions = ['er.person_id=p.person_id']
             if role:
                 event_conditions.append('er.role=?');params.append(role)
+            if territory:
+                if has_representations:
+                    event_conditions.append('EXISTS(SELECT 1 FROM role_representations rr WHERE rr.role_id=er.role_id AND territory_matches(rr.territory_name,?))')
+                    params.append(territory)
+                else:
+                    event_conditions.append('0')
             if year_from:
                 event_conditions.append('COALESCE(e.year_end,er.year_end,er.year_start)>=?');params.append(year_from)
             if year_to:
                 event_conditions.append('COALESCE(e.year_start,er.year_start)<=?');params.append(year_to)
             conditions.append('EXISTS(SELECT 1 FROM person_event_roles er LEFT JOIN events e ON e.event_id=er.event_id WHERE '+' AND '.join(event_conditions)+')')
+        query_active=bool(q or office or role or letter or start_raw or end_raw)
+        if export and not query_active:
+            abort(400)
         where = 'WHERE '+' AND '.join(conditions) if conditions else ''
         total,pages,people = 0,1,[]
         if not error:
@@ -251,18 +282,51 @@ def create_app(config=None):
                 pages = max(1,math.ceil(total/24));page=min(page,pages)
                 order = 'score,' if sort=='relevance' and query else ''
                 order += "COALESCE(p.surname,p.name) COLLATE POLISH,p.given_names COLLATE POLISH,p.person_id"
+                limit = '' if export or navigation_args is not None else ' LIMIT 24 OFFSET ?'
                 people = db.execute(f'''SELECT p.person_id,p.name,p.birth_date_raw,p.death_date_raw,
                     {snippet},{score},(SELECT count(*) FROM person_event_roles er WHERE er.person_id=p.person_id) AS role_count
-                    FROM persons p {join} {where} ORDER BY {order} LIMIT 24 OFFSET ?''',[*params,(page-1)*24]).fetchall()
+                    FROM persons p {join} {where} ORDER BY {order}'''+limit,
+                    params if export or navigation_args is not None else [*params,(page-1)*24]).fetchall()
             except sqlite3.OperationalError:
                 if not query:
                     raise
                 error = 'Niepoprawna składnia wyszukiwania. Sprawdź cudzysłowy i operatory lub wybierz „Wszystkie słowa”.'
+        if navigation_args is not None:
+            return dict(ids=[p['person_id'] for p in people] if not error else [],
+                        filters=filters, active=query_active, error=error)
+        if export and not error:
+            offices, codes = {}, {}
+            ids = {p['person_id'] for p in people}
+            # Jedno odczytanie list, bez osobnego zapytania dla każdej osoby.
+            for office_row in db.execute('''SELECT person_id,name FROM person_offices
+                ORDER BY COALESCE(dating_year_min,dating_year_max) IS NULL,
+                    COALESCE(dating_year_min,dating_year_max),position'''):
+                pid=office_row['person_id'];name=office_row['name'].strip()
+                if pid in ids and name and name not in offices.setdefault(pid,[]):offices[pid].append(name)
+            for role_row in db.execute('''SELECT person_id,event_code_raw FROM person_event_roles
+                ORDER BY year_start,year_end,position'''):
+                pid=role_row['person_id'];code=role_row['event_code_raw']
+                if pid in ids and code and code not in codes.setdefault(pid,[]):codes[pid].append(code)
+            rows=[dict(p,life_years=life_years(p),offices=offices.get(p['person_id'],[]),
+                       event_codes=codes.get(p['person_id'],[])) for p in people]
+            stream=build_people_xlsx(rows,translate=translate)
+            response=send_file(stream,mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                               as_attachment=True,download_name='parlamentarzysci-wyniki.xlsx')
+            response.headers['Cache-Control']='no-store'
+            return response
+        export_url=url_for('people_xlsx',**{k:v for k,v in filters.items() if v})
         def page_url(number):
             return url_for('index',**{k:v for k,v in filters.items() if v},page=number)
+        catalogue = urlencode({**{k:v for k,v in filters.items() if v}, 'page':page})
+        def person_url(person_id):
+            return url_for('person',person_id=person_id,catalogue=catalogue)
         return render_template('index.html',filters=filters,people=people,total=total,error=error,
             page=page,pages=pages,page_url=page_url,page_numbers=range(max(1,page-2),min(pages,page+2)+1),
-            alphabet=ALPHABET.upper(),query_active=bool(q or office or role or letter or start_raw or end_raw)),400 if error else 200
+            person_url=person_url,territories=territories,alphabet=ALPHABET.upper(),export_url=export_url,query_active=query_active),400 if error else 200
+
+    @app.route('/persons/export.xlsx')
+    def people_xlsx():
+        return index(export=True)
 
     def representation_labels(rows):
         ids=sorted({row['role_id'] for row in rows})
@@ -296,7 +360,8 @@ def create_app(config=None):
                 COALESCE(dating_year_min,dating_year_max),COALESCE(dating_year_max,dating_year_min),position''',(person_id,)).fetchall()
         titles = db.execute('SELECT * FROM person_titles WHERE person_id=? ORDER BY kind,position',(person_id,)).fetchall()
         roles = db.execute('''SELECT er.*,e.name AS event_name,e.place AS event_place,e.date_raw AS event_date_raw,
-            e.occurrence_status FROM person_event_roles er LEFT JOIN events e ON e.event_id=er.event_id
+            e.occurrence_status,e.date_start AS event_date_start,e.year_start AS event_year_start,
+            e.source_paragraph AS event_source_paragraph FROM person_event_roles er LEFT JOIN events e ON e.event_id=er.event_id
             WHERE er.person_id=? ORDER BY COALESCE(e.year_start,er.year_start,9999),COALESCE(e.source_paragraph,99999),er.position''',(person_id,)).fetchall()
         labels=representation_labels(roles)
         roles=[dict(row,representations=labels.get(row['role_id'],[]),participation_notes=participation_notes(row)) for row in roles]
@@ -304,7 +369,32 @@ def create_app(config=None):
 
     @app.route('/persons/<int:person_id>')
     def person(person_id):
-        return render_template('person.html',**person_context(person_id))
+        context=person_context(person_id)
+        view='timeline' if request.args.get('view')=='timeline' else 'tables'
+        navigation = None
+        catalogue = request.args.get('catalogue', '')
+        if catalogue and len(catalogue) <= 4000:
+            values = {k:v[-1] for k,v in parse_qs(catalogue).items()}
+            result = index(navigation_args=values)
+            ids = result['ids']
+            if person_id in ids:
+                position = ids.index(person_id)
+                catalogue = urlencode({k:v for k,v in result['filters'].items() if v})
+                def adjacent_url(offset):
+                    target = position + offset
+                    if not 0 <= target < len(ids):
+                        return None
+                    return url_for('person',person_id=ids[target],catalogue=catalogue,view=view)
+                navigation = dict(previous=adjacent_url(-1), next=adjacent_url(1),
+                    back=url_for('index',**{k:v for k,v in result['filters'].items() if v},page=position//24+1),
+                    position=position+1,total=len(ids),active=result['active'])
+        def career_url(selected):
+            values = dict(person_id=person_id,view=selected)
+            if navigation:
+                values['catalogue'] = catalogue
+            return url_for('person',**values)
+        return render_template('person.html',**context,career_view=view,navigation=navigation,career_url=career_url,
+                               career=build_career(context['offices'],context['roles']) if view=='timeline' else [])
 
     @app.route('/persons/<int:person_id>/pdf')
     def person_pdf(person_id):
@@ -315,8 +405,18 @@ def create_app(config=None):
         response.headers['Cache-Control'] = 'no-store'
         return response
 
+    @app.route('/persons/<int:person_id>/docx')
+    def person_docx(person_id):
+        context = person_context(person_id)
+        stream = build_person_docx(context, app_title=TITLE, format_source=format_source, certainty=CERTAINTY)
+        filename = (secure_filename(context['person']['name']) or 'biogram')+'.docx'
+        response = send_file(stream, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                             as_attachment=True, download_name=filename)
+        response.headers['Cache-Control'] = 'no-store'
+        return response
+
     @app.route('/events')
-    def events():
+    def events(export=False):
         db = get_db()
         view = request.args.get('view', 'list')
         if view not in ('list', 'cards'):
@@ -355,10 +455,24 @@ def create_app(config=None):
             WHERE event_id IS NOT NULL ORDER BY normalized_code'''):
             event_codes.setdefault(match['event_id'],[]).append(match['normalized_code'])
         filters = dict(code=code,type=kind,year_from=start,year_to=end)
+        query_active=bool(code or kind or start or end)
+        if export and not query_active:
+            abort(400)
+        if export and not error:
+            stream=build_events_xlsx(rows,event_codes,translate=translate)
+            response=send_file(stream,mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                               as_attachment=True,download_name='sejmy-i-zjazdy-wyniki.xlsx')
+            response.headers['Cache-Control']='no-store'
+            return response
+        export_url=url_for('events_xlsx',**{k:v for k,v in filters.items() if v})
         def view_url(selected):
             return url_for('events', **{k:v for k,v in filters.items() if v}, view=selected)
         return render_template('events.html',events=rows,event_codes=event_codes,kinds=kinds,error=error,
-            filters=filters,view=view,view_url=view_url),400 if error else 200
+            filters=filters,view=view,view_url=view_url,query_active=query_active,export_url=export_url),400 if error else 200
+
+    @app.route('/events/export.xlsx')
+    def events_xlsx():
+        return events(export=True)
 
     def role_groups(rows):
         labels=representation_labels(rows)
@@ -429,6 +543,30 @@ def create_app(config=None):
         filename = secure_filename(event['name']+'-'+label)+'.pdf'
         response = send_file(stream, mimetype='application/pdf', as_attachment=True,
                              download_name=filename)
+        response.headers['Cache-Control'] = 'no-store'
+        return response
+
+    @app.route('/events/<event_id>/docx')
+    def event_docx(event_id):
+        context = event_context(event_id)
+        stream = build_event_docx(context, app_title=translate(TITLE), role_names=ROLE_NAMES, translate=translate)
+        event = context['event']
+        label = '-'.join(event['codes']) or event_id
+        filename = (secure_filename(event['name']+'-'+label) or 'wydarzenie')+'.docx'
+        response = send_file(stream, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                             as_attachment=True, download_name=filename)
+        response.headers['Cache-Control'] = 'no-store'
+        return response
+
+    @app.route('/events/<event_id>/xlsx')
+    def event_xlsx(event_id):
+        context = event_context(event_id)
+        stream = build_event_xlsx(context, app_title=translate(TITLE), role_names=ROLE_NAMES, translate=translate)
+        event = context['event']
+        label = '-'.join(event['codes']) or event_id
+        filename = (secure_filename(event['name']+'-'+label) or 'wydarzenie')+'.xlsx'
+        response = send_file(stream, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                             as_attachment=True, download_name=filename)
         response.headers['Cache-Control'] = 'no-store'
         return response
 

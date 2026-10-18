@@ -147,3 +147,56 @@
 /* Zastrzeżenia udziału: kolor uzupełnia dostępny przycisk z objaśnieniem. */
 tr.participation-uncertain>td{background:#fff8e8}
 @media screen{[data-theme="dark"] tr.participation-uncertain>td{background:#363020}}
+
+.filter-panel input:disabled { opacity: .55; cursor: not-allowed; }
+
+.export-menu{position:relative;flex-shrink:0}
+.export-menu summary{list-style:none;cursor:pointer;display:flex;gap:14px;align-items:center}
+.export-menu summary::-webkit-details-marker{display:none}
+.export-options{position:absolute;right:0;top:100%;z-index:20;min-width:190px;padding:6px;background:var(--surface,#fff);border:1px solid var(--line,#d7cec0);border-radius:6px;box-shadow:0 6px 18px #0002}
+.export-options a{display:block;padding:10px 12px;white-space:nowrap;border-radius:3px}
+.export-options a:hover,.export-options a:focus-visible{background:#f5f2eb;color:#714b21}
+[data-theme="dark"] .export-options{background:#25231f;border-color:#625640}
+[data-theme="dark"] .export-options a:hover,[data-theme="dark"] .export-options a:focus-visible{background:#3c3226;color:var(--accent)}
+@media print{.export-menu{display:none}}
+
+.results-actions{display:flex;align-items:center;justify-content:flex-end;gap:16px;flex-wrap:wrap;color:var(--muted)}
+.results-export{font-size:.78rem;padding:7px 10px;border-color:var(--line);color:var(--accent);background:var(--surface);font-weight:600}
+.results-export:hover{border-color:var(--accent)}
+@media(max-width:720px){.results-heading{flex-wrap:wrap;gap:12px}.results-actions{justify-content:flex-start}}
+
+.app-help-button{border:0;background:transparent;color:var(--muted);font:inherit;font-size:.8rem;padding:8px 3px;min-height:44px;flex-shrink:0}
+.app-help-button:hover{color:var(--accent);text-decoration:underline}
+.app-help-is-open{overflow:hidden}
+@media print{#app-help-dialog,.app-help-button{display:none}}
+
+.career-switch{display:flex;gap:4px;flex-wrap:wrap;margin:0 0 20px;border-bottom:1px solid var(--line)}
+.career-switch a{padding:10px 16px;color:var(--muted);font-size:.9rem;border-bottom:2px solid transparent}
+.career-switch a[aria-current="true"]{color:var(--accent);border-color:var(--accent);font-weight:650}
+.career-year{display:grid;grid-template-columns:90px minmax(0,1fr);gap:18px;margin-top:26px}
+.career-year>h3{font-size:1rem;color:var(--muted);font-weight:600;margin:12px 0;overflow-wrap:anywhere}
+.career-items{list-style:none;margin:0;padding:0 0 0 22px;border-left:2px solid var(--line)}
+.career-item{position:relative;padding:12px 16px;margin:0 0 16px;border:1px solid var(--line);border-radius:5px;overflow-wrap:anywhere}
+.career-item::before{content:"";position:absolute;left:-29px;top:20px;width:10px;height:10px;border-radius:50%;background:var(--accent);border:2px solid var(--surface)}
+.career-item h4{font-size:1rem;font-weight:600;margin:6px 0 8px;line-height:1.5}
+.career-item p{margin-bottom:8px}
+.career-date{font-size:.85rem;color:var(--muted);margin:6px 0}
+.career-role{font-size:.88rem;line-height:1.6;margin:8px 0}
+.career-role strong{font-weight:600}
+.career-uncertain{background:#fff6df}
+[data-theme="dark"] .career-uncertain{background:#3a3020}
+@media(max-width:720px){.career-year{grid-template-columns:1fr;gap:6px}.career-year>h3{margin:0 0 8px}.career-items{margin-left:5px;padding-left:18px}.career-item::before{left:-25px}}
+@media print{.career-switch{display:none}.career-year{break-inside:auto}.career-item{break-inside:avoid}}
+
+.event-summary{font-size:1rem;font-weight:600;line-height:1.65;color:var(--ink);gap:14px 30px}
+@media(max-width:720px){.event-summary{font-size:.95rem;gap:10px 20px}}
+
+.person-navigation { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.8rem 0; margin-bottom:1.4rem; border-bottom:1px solid var(--line); font-size:.9rem; }
+.person-navigation-back { text-align:center; }
+@media(max-width:640px) { .person-navigation { flex-wrap:wrap; gap:.75rem; } .person-navigation-back { order:-1; flex-basis:100%; } }
+
+/* Zachowaj geometrię nagłówka przed uruchomieniem JavaScriptu. */
+.theme-toggle[hidden]{display:inline-flex!important;visibility:hidden}
+/* Długość biogramu nie powinna zmieniać szerokości obszaru strony. */
+html{scrollbar-gutter:stable}
+@supports not (scrollbar-gutter:stable){html{overflow-y:scroll}}

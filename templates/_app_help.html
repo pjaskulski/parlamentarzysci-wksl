@@ -1,0 +1,33 @@
+<dialog id="app-help-dialog" class="search-help-dialog" aria-labelledby="app-help-title">
+  <div class="search-help-header"><h2 id="app-help-title">{{ _('Korzystanie z bazy') }}</h2><button type="button" class="search-help-close" id="app-help-close" aria-label="{{ _('Zamknij pomoc aplikacji') }}" autofocus>×</button></div>
+  <div class="search-help-content">
+    <p>{{ _('Baza służy do przeglądania biogramów parlamentarzystów Wielkiego Księstwa Litewskiego oraz ich powiązań z sejmami i zjazdami.') }}</p>
+    <section><h3>{{ _('Katalog osób i karta osoby') }}</h3>
+      <p>{{ _('W zakładce „Osoby” wybierz nazwę osoby (parlamentarzysty), aby otworzyć jej kartę. Zakładka domyślnie wyświetla pełną listę parlamentarzystów, w przypadku uruchomienia wyszukiwania lub filtrów wyswietla podzbiór osób odpowiadających nałożonym kryteriom. Przyciski pod listą pozwalają przechodzić między stronami wyników, także do pierwszej i ostatniej strony.') }}</p>
+      <p>{{ _('Karta zawiera tekst biogramu, imiona i warianty nazwisk oraz dostępne informacje o datach życia, urzędach, funkcjach parlamentarnych, godnościach, edukacji, majątku i źródłach. Poszczególne sekcje pojawiają się tylko wówczas, gdy biogram zawierał odpowiednie dane.') }}</p>
+      <p>{{ _('W tabeli funkcji parlamentarnych osoby można kliknąć nazwę sejmu lub zjazdu, aby przejść do strony tego wydarzenia. Kolumna „Posłował z” wskazuje obszar reprezentowany przez posła.') }}</p>
+    </section>
+    <section><h3>{{ _('Przeglądanie sejmów i zjazdów') }}</h3>
+      <p>{{ _('Zakładka „Sejmy i zjazdy” przedstawia te wydarzenia uporządkowane chronologicznie. Przełącznik nad wykazem pozwala wybrać widok listy (domyślny) lub kafelków. Kliknięcie nazwy otwiera kartę wydarzenia.') }}</p>
+      <p>{{ _('Na karcie wydarzenia uczestnicy są podzieleni według funkcji, np. na posłów i senatorów. Grupy można zwijać i rozwijać. Kliknięcie nazwiska prowadzi do karty osoby.') }}</p>
+      <p>{{ _('Lista urzędów przy uczestniku obejmuje urzędy wymienione w jego biogramie; nie oznacza, że wszystkie sprawował podczas danego sejmu.') }}</p>
+    </section>
+    <section><h3>{{ _('Kody wydarzeń i oznaczenia') }}</h3>
+      <p>{{ _('Kody sejmów/zjazdów, np. 1587/I, odpowiadają zapisom stosowanym w biogramach. /I, /II i /III oznaczają kolejność wydarzeń w roku, a /k — konwokację.') }}</p>
+      <p>{{ _('Znak ? przy nazwie obszaru oznacza niepewność miejsca, które reprezentował poseł. Żółte tło wiersza sygnalizuje niepewność lub zastrzeżenia dotyczące mandatu, udziału albo identyfikacji osoby. Po kliknięciu symbol ⓘ, można przeczytać wyjaśnienie dotyczące niepewności. Ikona ta może także przekazywać informację uzupełniającą, np. o obecności z urzędu, bez żółtego tła wiersza.') }}</p>
+      <p>{{ _('Kreska oznacza brak podanej informacji.') }}</p>
+    </section>
+    <section><h3>{{ _('Pobieranie danych') }}</h3>
+      <p>{{ _('Na karcie osoby menu „Eksportuj” udostępnia eksport do PDF i DOCX. Na karcie sejmu lub zjazdu dostępny jest również eksport do XLSX z opisem wydarzenia i osobnymi arkuszami grup uczestników.') }}</p>
+      <p>{{ _('Po zastosowaniu wyszukiwania lub filtrów przy liczbie wyników pojawia się przycisk „Eksportuj do XLSX”. Pobierany plik obejmuje wszystkie pasujące wyniki, nie tylko bieżącą stronę. Przycisk nie jest wyświetlany przy pustym wyniku lub przed zastosowaniem wyszukiwania/filtrowania.') }}</p>
+      <p>{{ _('Eksport z katalogu parlamentarzystów zawiera nazwę osoby, lata życia, urzędy i kody sejmów oraz zjazdów. Listy urzędów i wydarzeń obejmują całą kartę znalezionej osoby, także poza okresem użytym do filtrowania. Eksport wykazu wydarzeń zawiera kolumny z danymi widocznymi w widoku listy.') }}</p>
+    </section>
+    <section><h3>{{ _('Wyszukiwanie i filtrowanie') }}</h3>
+      <p>{{ _('Zasady wyszukiwania, składnię zapytań oraz przykłady łączenia filtrów opisuje okno „Jak wyszukiwać?”, dostępne pod panelem filtrów w katalogu osób.') }}</p>
+      <p><a id="app-help-search" href="{{ url_for('index') }}#search-help-dialog">{{ _('Otwórz „Jak wyszukiwać?”') }}</a></p>
+    </section>
+    <section><h3>{{ _('Język, wygląd i informacje o danych') }}</h3>
+      <p>{{ _('Przełącznik PL / EN zmienia język interfejsu. Przycisk słońca lub księżyca zmienia motyw na dzienny lub nocny. Informacje o pochodzeniu danych znajdują się w stopce aplikacji.') }}</p>
+    </section>
+  </div>
+</dialog>

@@ -15,11 +15,17 @@ def distinct_explanations(notes):
 
 
 def display_participation_notes(row):
-    return distinct_explanations(participation_notes(row))
+    # Niepewność obszaru posłowania jest prezentowana przy nazwie znakiem ?.
+    # Nie stanowi zastrzeżenia dotyczącego samego mandatu ani obecności.
+    return distinct_explanations([
+        note for note in participation_notes(row)
+        if note['label'] != 'Reprezentacja niepewna'
+    ])
 
 
 def public_explanation(label, local=''):
     defaults = {
+        'Charakter funkcji': 'Dodatkowe informacje o sprawowaniu funkcji.',
         'Przybył w trakcie obrad': 'Dołączył do zgromadzenia po rozpoczęciu obrad.',
         'Reprezentacja niepewna': 'Nie ustalono jednoznacznie, jakie terytorium reprezentował.',
         'Nie uczestniczył w posiedzeniach senatu': 'Był obecny w miejscu obrad, ale nie uczestniczył w posiedzeniach senatu.',
@@ -67,10 +73,10 @@ def participation_notes(row):
     role = row.get('role')
     notes = []
 
-    def add(label, kind='uncertain'):
+    def add(label, kind='uncertain', fallback=None):
         public = record.get('uwagi_publiczne') or {}
         text = public.get(label) if isinstance(public, dict) else None
-        explanation = text.strip() if isinstance(text, str) and text.strip() else public_explanation(label, local)
+        explanation = text.strip() if isinstance(text, str) and text.strip() else fallback or public_explanation(label, local)
         notes.append(dict(label=label, explanation=explanation, kind=kind))
 
     correction = record.get('podstawa_korekty')
@@ -96,6 +102,12 @@ def participation_notes(row):
         add('Identyfikacja osoby niepewna')
     elif certainty == 'niepewne' and re.search(r'\bmoże\s+to\b|\btożsamoś\w*|\bpomyłka co do nazwiska\b', identity_text, re.I):
         add('Identyfikacja osoby niepewna')
+    if record.get('objaśnienie_przewodniczenia'):
+        add('Charakter funkcji', 'info')
+    if record.get('zakres_udziału'):
+        add('Okres udziału', 'info', record['zakres_udziału'])
+    if record.get('objaśnienie_udziału'):
+        add('Charakter udziału', 'info', record['objaśnienie_udziału'])
     if record.get('data_przybycia'):
         add('Przybył w trakcie obrad', 'info')
     if record.get('niepewność_reprezentacji'):

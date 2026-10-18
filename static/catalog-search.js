@@ -1,4 +1,15 @@
 (() => {
+  const role = document.getElementById('role');
+  const territory = document.getElementById('territory');
+  if (!role || !territory) return;
+  function updateTerritory() {
+    territory.disabled = role.value !== 'poseł';
+    if (territory.disabled) territory.value = '';
+  }
+  role.addEventListener('change', updateTerritory);
+  updateTerritory();
+})();
+(() => {
   const field = document.getElementById('q');
   const form = field?.form;
   if (!form || !field.defaultValue.trim()) return;

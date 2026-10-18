@@ -8,6 +8,7 @@
     dialog.scrollTop = 0;
     document.body.classList.add('search-help-is-open');
   });
+  if (window.location.hash === '#search-help-dialog') opener.click();
   closer.addEventListener('click', () => dialog.close());
   dialog.addEventListener('close', () => {
     document.body.classList.remove('search-help-is-open');

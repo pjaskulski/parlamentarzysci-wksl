@@ -1,0 +1,33 @@
+<section class="detail-section career-section" aria-labelledby="career-title">
+<div class="section-heading"><h2 id="career-title">{{ _('Przebieg kariery') }}</h2></div>
+<p class="muted small">{{ _('Datowanie urzędów zachowuje zapis źródłowy i nie zawsze oznacza objęcie urzędu. Kolejność wpisów w obrębie roku nie rozstrzyga następstwa zdarzeń bez dokładnych dat.') }}</p>
+<p class="muted small">{{ _('/I, /II, /III oznacza kolejność w roku, /k — konwokację. Znak ? wskazuje niepewność. Żółte tło oznacza niepewność lub zastrzeżenia dotyczące udziału. Symbol ⓘ umożliwia wyświetlenie dodatkowych wyjaśnień.') }}</p>
+{% for group in career %}
+<section class="career-year" aria-labelledby="career-year-{{ loop.index }}">
+<h3 id="career-year-{{ loop.index }}">{{ group.year if group.year else _('Bez ustalonego datowania') }}</h3>
+<ol class="career-items">
+{% for item in group['items'] %}
+<li class="career-item{% if item.kind=='event' and item.uncertain %} career-uncertain{% endif %}">
+{% if item.kind=='office' %}
+<span class="kind-label">{{ _('Urząd') }}</span>
+<p class="career-date">{{ item.office.dating_raw or _('Bez ustalonego datowania') }}</p>
+<h4>{{ item.office.name }}</h4>
+{% if item.office.office_type %}<p class="muted small">{{ _('Rodzaj:') }} {{ item.office.office_type }}</p>{% endif %}
+{% if not item.office.name.lower().startswith('niedoszły ') %}{% if item.status %}<p class="muted small">{{ _(item.status) }}</p>{% elif item.office.certainty=='odrzucone_lub_prostowane' %}<p class="muted small">{{ item.office.certainty|certainty }}</p>{% endif %}{% endif %}
+{% else %}
+<span class="kind-label">{{ _('Sejm lub zjazd') }}</span>
+{% if item.event.event_id %}
+<h4><a href="{{ url_for('event_detail',event_id=item.event.event_id) }}">{{ _(item.event.event_name) }} ({{ item.codes|join(', ') }})</a></h4>
+<p class="muted small">{{ item.event.event_place or _('Miejsce niepodane w nagłówku') }} · {{ item.event.event_date_raw }}</p>
+{% else %}
+<h4><a href="{{ url_for('event',code=item.event.event_code_raw,type=item.event.event_type or '') }}">{{ item.codes|join(', ') }}</a></h4><p class="muted small">{{ _('Wydarzenie nieustalone') }}</p>
+{% endif %}
+{% for role in item.roles %}<div class="career-role"><strong>{{ _(role.role|capitalize) }}</strong>{% if role.representations %}<span> · {{ _('Posłował z') }}: {{ role.representations|join('; ') }}</span>{% endif %}{{ participation_notes(role.participation_notes) }}</div>{% endfor %}
+{% if item.event.occurrence_status in ['not_held','cancelled'] %}<p class="muted small">{{ _('Obrady nie odbyły się.') }}</p>{% endif %}
+{% endif %}
+</li>
+{% endfor %}
+</ol>
+</section>
+{% endfor %}
+</section>

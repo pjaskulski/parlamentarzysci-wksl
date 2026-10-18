@@ -77,7 +77,9 @@ def build_person_pdf(context, *, app_title, format_source, certainty):
                 note = item.get('uwaga')
                 if note == 'Fragment listy kariery; możliwa elipsa urzędu lub kontynuacja datowania.':
                     note = None
-                notes = [certainty_label(item.get('pewność')),note]
+                level = item.get('pewność')
+                label = '' if level=='niepewne' and str(text).lower().startswith('prawdopodobnie ') else certainty_label(level)
+                notes = [label,note]
                 if any(notes):
                     story.append(paragraph(' · '.join(str(n) for n in notes if n),'small'))
             else:
@@ -113,7 +115,7 @@ def build_person_pdf(context, *, app_title, format_source, certainty):
             name = office['name']
             if office['office_type']:
                 name += '\nRodzaj: '+office['office_type']
-            if certainty_label(office['certainty']):
+            if office['certainty']=='odrzucone_lub_prostowane' and not office['name'].lower().startswith('niedoszły '):
                 name += '\n'+certainty_label(office['certainty'])
             date = office['dating_raw'] or 'Niepodane'
             rows.append((name,date))
@@ -140,15 +142,12 @@ def build_person_pdf(context, *, app_title, format_source, certainty):
             role_label=role['role'].capitalize()
             if role['attendance']=='mandat_nieuznany':role_label+=' — mandat nieuznany'
             rows.append((event,role_label,representation))
-        table(['Sejm lub zjazd','Rola','Reprezentacja'],rows,[.52,.14,.34])
+        table(['Sejm lub zjazd','Rola','Posłował z'],rows,[.52,.14,.34])
 
     for key,values in context['sections']:
         if values:
             heading(key.replace('_',' ').capitalize())
             items(values,bibliography=key=='źródła')
-    if record.get('odsyłacze'):
-        heading('Odsyłacze w biogramie')
-        items(record['odsyłacze'])
 
     def page_decoration(canvas, document):
         canvas.saveState()
@@ -234,7 +233,7 @@ def build_event_pdf(context, *, app_title, role_names, translate=lambda text: te
                                 ' ('+str(len(people))+')', group_heading)
         headers = ['Osoba', 'Lata życia']
         if role == 'poseł':
-            headers.append('Reprezentacja')
+            headers.append('Posłował z')
         headers.append('Urzędy')
         values = [[paragraph(translate(h), label) for h in headers]]
         for person in people:

@@ -12,7 +12,7 @@
 <button class="button primary" type="submit">{{ _('Zastosuj') }}</button><a href="{{ url_for('events',view=view) }}">{{ _('Wyczyść') }}</a>
 </form>
 {% if error %}<div class="notice error" role="alert">{{ _(error) }}</div>{% endif %}
-<div class="results-heading events-results-heading"><h2>{{ _('Chronologiczny wykaz') }}</h2><div class="events-view-actions"><span>{{ _('Wydarzenia:') }} {{ events|length }}</span>
+<div class="results-heading events-results-heading"><h2>{{ _('Chronologiczny wykaz') }}</h2><div class="events-view-actions"><span>{{ _('Wydarzenia:') }} {{ events|length }}</span>{% if query_active and not error and events %}<a class="button results-export" href="{{ export_url }}">{{ _('Eksportuj do XLSX') }}</a>{% endif %}
   <div class="event-view-switch" role="group" aria-label="{{ _('Widok wydarzeń') }}">
     <a href="{{ view_url('list') }}"{% if view=='list' %} aria-current="true"{% endif %}><svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M5 4h9M5 8h9M5 12h9M2 4h1M2 8h1M2 12h1"/></svg>{{ _('Lista') }}</a>
     <a href="{{ view_url('cards') }}"{% if view=='cards' %} aria-current="true"{% endif %}><svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="2" y="2" width="4" height="4" rx=".5"/><rect x="10" y="2" width="4" height="4" rx=".5"/><rect x="2" y="10" width="4" height="4" rx=".5"/><rect x="10" y="10" width="4" height="4" rx=".5"/></svg>{{ _('Kafelki') }}</a>
