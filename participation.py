@@ -17,10 +17,19 @@ def distinct_explanations(notes):
 def display_participation_notes(row):
     # Niepewność obszaru posłowania jest prezentowana przy nazwie znakiem ?.
     # Nie stanowi zastrzeżenia dotyczącego samego mandatu ani obecności.
-    return distinct_explanations([
+    notes = distinct_explanations([
         note for note in participation_notes(row)
         if note['label'] != 'Reprezentacja niepewna'
     ])
+    # Zakwestionowanie poselstwa ma własne wyjaśnienie. Automatyczny
+    # komunikat o braku potwierdzenia obecności nie wnosi wtedy informacji.
+    # Zachowujemy natomiast szczegółowe zastrzeżenia dotyczące obecności.
+    if any(note['label'] == 'Informacja zakwestionowana' for note in notes):
+        notes = [note for note in notes if not (
+            note['label'] == 'Obecność niepotwierdzona'
+            and note['explanation'] == public_explanation('Obecność niepotwierdzona')
+        )]
+    return notes
 
 
 def public_explanation(label, local=''):
