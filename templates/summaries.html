@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% from '_participation_notes.html' import participation_notes %}
+{% block title %}{{ _('Zestawienia') }} · {{ app_title }}{% endblock %}
+{% block content %}
+<section class="catalog-heading"><div><p class="eyebrow">{{ _('Sejmy, osoby i obszary') }}</p><h1>{{ _('Zestawienia') }}</h1></div></section>
+<div id="rankings" class="summaries-intro">
+  <p>{{ _('Zestawienia obejmują wydarzenia, które się odbyły. Każda osoba jest liczona raz w danym wydarzeniu, niezależnie od liczby pełnionych funkcji.') }}</p>
+  <p class="muted small">{{ _('Nie uwzględniono nieobecnych, odrzuconych mandatów ani błędnych przypisań. Liczby opisują zawartość bazy, nie pełny skład zgromadzeń.') }}</p>
+  <form method="get" action="{{ url_for('summaries') }}#rankings" class="summaries-options">
+    <input type="hidden" name="lang" value="{{ language }}"><input type="hidden" name="territory" value="{{ selected_territory }}">
+    <label><input type="checkbox" name="include_uncertain" value="1"{% if include_uncertain %} checked{% endif %}> {{ _('Uwzględnij niepewne uczestnictwa w rankingach') }}</label>
+    <button type="submit" class="button">{{ _('Zastosuj') }}</button>
+  </form>
+</div>
+<div class="summaries-rankings">
+<section class="detail-section"><div class="section-heading"><h2>{{ _('Sejmy i zjazdy z największą liczbą uczestników') }}</h2></div>
+<p class="muted small">{{ _('10 wydarzeń') }}</p><div class="table-scroll"><table><thead><tr><th>{{ _('Sejm lub zjazd') }}</th><th class="summary-count">{{ _('Osoby') }}</th></tr></thead><tbody>
+{% for event in event_ranking %}<tr><td><span class="muted small block">{{ event_codes.get(event.event_id,[])|join(' · ') or '—' }}</span><a href="{{ url_for('event_detail',event_id=event.event_id) }}">{{ _(event.name) }}</a><span class="muted small block">{{ event.place or '—' }} · {{ event.date_raw }}</span></td><td class="summary-count"><strong>{{ event.people_count }}</strong></td></tr>{% endfor %}
+</tbody></table></div>{% if not event_ranking %}<p class="muted">{{ _('Brak wyników') }}</p>{% endif %}</section>
+<section class="detail-section"><div class="section-heading"><h2>{{ _('Osoby z największą liczbą uczestnictw') }}</h2></div>
+<p class="muted small">{{ _('10 osób · wszystkie funkcje parlamentarne') }}</p><div class="table-scroll"><table><thead><tr><th>{{ _('Osoba') }}</th><th class="summary-count">{{ _('Sejmy i zjazdy') }}</th></tr></thead><tbody>
+{% for person in person_ranking %}<tr><td><a href="{{ url_for('person',person_id=person.person_id) }}">{{ person.name }}</a></td><td class="summary-count"><strong>{{ person.event_count }}</strong></td></tr>{% endfor %}
+</tbody></table></div>{% if not person_ranking %}<p class="muted">{{ _('Brak wyników') }}</p>{% endif %}</section>
+</div>
+<section id="territorial" class="summary-territorial">
+<div class="section-heading"><h2>{{ _('Posłowie wybranego obszaru') }}</h2></div>
+<form method="get" action="{{ url_for('summaries') }}#territorial" class="summary-territory-form">
+  <input type="hidden" name="lang" value="{{ language }}">{% if include_uncertain %}<input type="hidden" name="include_uncertain" value="1">{% endif %}
+  <div><label for="summary-territory">{{ _('Ziemia / powiat / województwo') }}</label><select id="summary-territory" name="territory"><option value="">{{ _('Wybierz obszar') }}</option>{% for territory in territories %}<option value="{{ territory }}"{% if selected_territory==territory %} selected{% endif %}>{{ territory }}</option>{% endfor %}</select></div>
+  <button type="submit" class="button primary">{{ _('Pokaż zestawienie') }}</button>
+</form>
+{% if error %}<div class="notice error" role="alert">{{ _(error) }}</div>{% endif %}
+{% if selected_territory %}
+<h3 class="summary-area-title">{{ selected_territory }}</h3>
+<p class="muted small">{{ _('Chronologiczny wykaz obejmuje także przypisania niepewne i kwestionowane. Żółte tło i symbol ⓘ zachowują wyjaśnienia udziału; znak ? przy obszarze oznacza niepewność miejsca posłowania.') }}</p>
+{% for item in area_events %}<section class="detail-section summary-area-event">
+  <p class="eyebrow">{{ event_codes.get(item.event.event_id,[])|join(' · ') or '—' }}</p>
+  <h3><a href="{{ url_for('event_detail',event_id=item.event.event_id) }}">{{ _(item.event.name) }}</a></h3>
+  <p class="muted">{{ item.event.place or '—' }} · {{ item.event.date_raw }}</p>
+  <div class="table-scroll"><table><thead><tr><th>{{ _('Osoba') }}</th><th>{{ _('Posłował z') }}</th></tr></thead><tbody>
+  {% for person in item.people %}<tr{% if person.participation_notes|rejectattr('kind','equalto','info')|list or person.participation_notes|selectattr('label','in',['Nie uczestniczył w posiedzeniach senatu','Nieobecny na obradach'])|list %} class="participation-uncertain"{% endif %}><td><a href="{{ url_for('person',person_id=person.person_id) }}">{{ person.name }}</a>{{ participation_notes(person.participation_notes) }}</td><td>{{ person.representations|join('; ') or '—' }}</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>{% else %}<p class="muted">{{ _('Brak wyników') }}</p>{% endfor %}
+{% else %}<p class="muted">{{ _('Wybierz obszar, aby zobaczyć sejmy i reprezentujących go posłów.') }}</p>{% endif %}
+</section>
+{% endblock %}

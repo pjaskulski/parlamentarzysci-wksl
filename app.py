@@ -20,6 +20,7 @@ if __package__:
     from .career import build_career
     from .xlsx_export import build_event_xlsx, build_people_xlsx, build_events_xlsx
     from .participation import display_participation_notes as participation_notes, distinct_explanations
+    from .summaries import ranked_participations
     from .i18n import translate, language, counted
 else:
     from pdf_export import build_person_pdf, build_event_pdf
@@ -27,6 +28,7 @@ else:
     from career import build_career
     from xlsx_export import build_event_xlsx, build_people_xlsx, build_events_xlsx
     from participation import display_participation_notes as participation_notes, distinct_explanations
+    from summaries import ranked_participations
     from i18n import translate, language, counted
 
 ROOT = Path(__file__).resolve().parent
@@ -138,7 +140,7 @@ def create_app(config=None):
 
     def language_url(selected):
         allowed = {'q', 'mode', 'role', 'office', 'letter', 'sort', 'page',
-                   'year_from', 'year_to', 'code', 'type', 'view', 'territory', 'catalogue'}
+                   'year_from', 'year_to', 'code', 'type', 'view', 'territory', 'catalogue', 'include_uncertain'}
         values = {key:request.args.getlist(key) for key in allowed if key in request.args}
         values.update(request.view_args or {})
         values['lang'] = selected
@@ -414,6 +416,47 @@ def create_app(config=None):
                              as_attachment=True, download_name=filename)
         response.headers['Cache-Control'] = 'no-store'
         return response
+
+    @app.route('/summaries')
+    def summaries():
+        db=get_db()
+        include_uncertain=request.args.get('include_uncertain')=='1'
+        selected=request.args.get('territory','').strip()
+        events_by_id={r['event_id']:dict(r) for r in db.execute('SELECT * FROM events')}
+        rows=db.execute('''SELECT er.*,p.name,p.surname,p.birth_date_raw,p.death_date_raw
+            FROM person_event_roles er JOIN persons p USING(person_id)
+            ORDER BY COALESCE(p.surname,p.name) COLLATE POLISH,p.name COLLATE POLISH,er.position''').fetchall()
+        event_ranking,person_ranking=ranked_participations(rows,events_by_id,include_uncertain)
+        event_ranking.sort(key=lambda e:(-e['people_count'],e['year_start'] or 9999,e['source_paragraph']))
+        person_ranking.sort(key=lambda p:(-p['event_count'],polish_key(p['surname']),polish_key(p['name']),p['person_id']))
+        event_codes={}
+        for r in db.execute('SELECT DISTINCT event_id,normalized_code FROM event_code_matches WHERE event_id IS NOT NULL ORDER BY normalized_code'):
+            event_codes.setdefault(r['event_id'],[]).append(r['normalized_code'])
+        territories=set();role_territories={}
+        if db.execute("SELECT 1 FROM sqlite_master WHERE name='role_representations'").fetchone():
+            for r in db.execute('SELECT role_id,territory_name FROM role_representations'):
+                parts=territory_parts(r['territory_name'])
+                territories.update(parts)
+                role_territories.setdefault(r['role_id'],set()).update(fold(p).casefold() for p in parts)
+        territories=sorted(territories,key=polish_key)
+        canonical={fold(t).casefold():t for t in territories}
+        error=None
+        if selected:
+            selected=canonical.get(fold(selected).casefold(),'') if len(selected)<=100 else ''
+            if not selected:
+                error='Wybierz obszar z listy.'
+        area_rows={}
+        if selected:
+            for r in rows:
+                if r['role']=='poseł' and r['event_id'] in events_by_id and fold(selected).casefold() in role_territories.get(r['role_id'],set()):
+                    area_rows.setdefault(r['event_id'],[]).append(r)
+        area_events=[]
+        for eid,members in area_rows.items():
+            area_events.append(dict(event=events_by_id[eid],people=role_groups(members).get('poseł',[])))
+        area_events.sort(key=lambda r:(r['event']['year_start'] or 9999,r['event']['source_paragraph']))
+        return render_template('summaries.html',event_ranking=event_ranking[:10],person_ranking=person_ranking[:10],
+            include_uncertain=include_uncertain,event_codes=event_codes,territories=territories,
+            selected_territory=selected,area_events=area_events,error=error),400 if error else 200
 
     @app.route('/events')
     def events(export=False):
