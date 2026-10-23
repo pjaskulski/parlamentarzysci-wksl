@@ -564,7 +564,7 @@ def create_app(config=None):
         event = dict(row)
         event['codes'] = [r['normalized_code'] for r in db.execute('''SELECT DISTINCT normalized_code
             FROM event_code_matches WHERE event_id=? ORDER BY normalized_code''',(event_id,))]
-        for key in ('sessions','sources','context'):
+        for key in ('sessions',):
             event[key] = json.loads(event[key+'_json'])
         rows = db.execute('''SELECT er.*,p.name,p.surname,p.birth_date_raw,p.death_date_raw FROM person_event_roles er
             JOIN persons p ON p.person_id=er.person_id WHERE er.event_id=?

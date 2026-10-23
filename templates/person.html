@@ -20,7 +20,7 @@
 {% if offices or roles %}
 <nav class="career-switch" aria-label="{{ _('Widok kariery') }}">
 <a href="{{ career_url('tables') }}"{% if career_view=='tables' %} aria-current="true"{% endif %}>{{ _('Zestawienia') }}</a>
-<a href="{{ career_url('timeline') }}"{% if career_view=='timeline' %} aria-current="true"{% endif %}>{{ _('Przebieg kariery') }}</a>
+<a href="{{ career_url('timeline') }}"{% if career_view=='timeline' %} aria-current="true"{% endif %}>{{ _('Oś czasu') }}</a>
 </nav>
 {% endif %}
 {% if career_view=='timeline' and career %}{% include '_career.html' %}{% endif %}

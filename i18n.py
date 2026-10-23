@@ -6,7 +6,7 @@ TRANSLATIONS = {
 'Poprzednia osoba': 'Previous person', 'Następna osoba': 'Next person',
 'Powrót do wyników': 'Back to results', 'Powrót do listy': 'Back to list',
 'Obecny z urzędu': 'Present ex officio',
-'Widok kariery': 'Career view', 'Zestawienia': 'Tables', 'Przebieg kariery': 'Career timeline',
+'Widok kariery': 'Career view', 'Zestawienia': 'Tables', 'Oś czasu': 'Timeline',
 'Bez ustalonego datowania': 'Undated', 'Urząd nieobjęty': 'Office not taken up', 'Urząd przypisany błędnie': 'Office incorrectly attributed',
 'Datowanie urzędów zachowuje zapis źródłowy i nie zawsze oznacza objęcie urzędu. Kolejność wpisów w obrębie roku nie rozstrzyga następstwa zdarzeń bez dokładnych dat.': 'Office dates retain the source notation and do not necessarily indicate when an office was taken up. The order of entries within a year does not establish the sequence of events without precise dates.',
 
